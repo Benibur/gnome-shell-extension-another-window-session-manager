@@ -141,6 +141,16 @@
       </description>
     </key>
 
+    <key name="autosave-sessions" type="s">
+      <default>'{}'</default>
+      <summary>Per-session periodic auto-save configuration</summary>
+      <description>
+      JSON object keyed by session filename. Each value is an object with
+      "enabled" (boolean) and "intervalMinutes" (integer) properties.
+      Example: {"my-session": {"enabled": true, "intervalMinutes": 10}}
+      </description>
+    </key>
+
     <key name="debugging-mode" type="b">
       <default>false</default>
       <summary>Enable or disable the debugging mode</summary>
