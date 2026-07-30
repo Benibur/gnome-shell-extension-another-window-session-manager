@@ -207,12 +207,52 @@ export const MoveSession = class {
                 // MetaWindow.move_to_monitor() can no longer be assumed to have updated the monitor on return, as under wayland
                 // Wait for the monitor change to take effect
                 // See: https://gitlab.gnome.org/GNOME/gnome-shell/-/commit/1cb01ec5b139da136cac665fc705e4ddd1d926a1
-                const id = global.display.connect('window-entered-monitor',
+                // Le handler DOIT être déconnecté dans tous les chemins de sortie.
+                // Avant (bug amont, toujours présent sur nlpsuge/main au 2026-07-30) :
+                // le disconnect n'avait lieu que si w === metaWindow, et resolve()
+                // était hors du test. Conséquences mesurées sur GNOME 46 :
+                //   - resolve() se déclenchait sur l'événement de N'IMPORTE quelle
+                //     fenêtre, donc la promesse pouvait se résoudre avant le vrai
+                //     déplacement ;
+                //   - tout événement venant d'une autre fenêtre laissait le handler
+                //     branché, et si la fenêtre cible n'entrait jamais sur le
+                //     moniteur il ne partait JAMAIS. Chaque handler fuité capture
+                //     metaWindow => MetaWindow et acteurs Clutter jamais libérés.
+                //     Journal du 2026-07-30 : 237 299 « Attempting to call back into
+                //     JSAPI during the sweeping phase of GC », signal fautif
+                //     window-entered-monitor sur MetaDisplay, gnome-shell à 2,27 Go
+                //     et 34-78 % d'un cœur sur son thread principal => souris,
+                //     clavier et alt-tab qui rament.
+                let id = 0, timeoutId = 0;
+                const finish = () => {
+                    if (id) {
+                        global.display.disconnect(id);
+                        id = 0;
+                    }
+                    if (timeoutId) {
+                        GLib.source_remove(timeoutId);
+                        timeoutId = 0;
+                    }
+                    resolve(metaWindow);
+                };
+
+                id = global.display.connect('window-entered-monitor',
                     (dsp, num, w) => {
-                        if (w === metaWindow)
-                            global.display.disconnect(id);
-                        resolve(metaWindow);
+                        if (w !== metaWindow)
+                            return;
+                        finish();
                     });
+
+                // Filet de sécurité : sans lui, une fenêtre qui n'entre jamais sur
+                // le moniteur (fermée entre-temps, move_to_monitor sans effet)
+                // laisserait le handler et la promesse pendants à vie.
+                timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3000, () => {
+                    timeoutId = 0;
+                    this._log.debug(`window-entered-monitor jamais reçu pour ${metaWindow.get_title()}, on libère le handler`);
+                    finish();
+                    return GLib.SOURCE_REMOVE;
+                });
+
                 metaWindow.move_to_monitor(toMonitorIndex);
             });
         }
