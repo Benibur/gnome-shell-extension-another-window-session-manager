@@ -106,6 +106,10 @@ class SessionItemButtons extends GObject.Object {
             const enabled = this._autosaveSwitch.state;
             this._setAutosaveConfig(enabled);
             if (enabled) {
+                this._saveSession.saveSessionAsync(
+                    this.sessionItem._filename, null, false, false).catch(e => {
+                    this._log.error(e, `Initial auto-save failed for ${this.sessionItem._filename}`);
+                });
                 this._startAutosaveTimer();
             } else {
                 this._stopAutosaveTimer();
@@ -115,6 +119,11 @@ class SessionItemButtons extends GObject.Object {
         this._settings.connect(`changed::${Constants.PREFS_SETTING_AUTOSAVE_SESSIONS}`, () => {
             const config = this._getAutosaveConfig();
             this._autosaveSwitch.state = config.enabled;
+            if (config.enabled) {
+                this._startAutosaveTimer();
+            } else {
+                this._stopAutosaveTimer();
+            }
         });
 
         this._addSeparator();
@@ -320,7 +329,7 @@ class SessionItemButtons extends GObject.Object {
         const config = this._getAutosaveConfig();
         const intervalSeconds = config.intervalMinutes * 60;
         this._autosaveTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, intervalSeconds, () => {
-            this._saveSession.saveSessionAsync(this.sessionItem._filename, null, false).catch(e => {
+            this._saveSession.saveSessionAsync(this.sessionItem._filename, null, false, false).catch(e => {
                 this._log.error(e, `Auto-save failed for session ${this.sessionItem._filename}`);
             });
             return GLib.SOURCE_CONTINUE;

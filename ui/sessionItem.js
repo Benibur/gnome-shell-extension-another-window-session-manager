@@ -1,5 +1,6 @@
 'use strict';
 
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
@@ -36,7 +37,10 @@ class SessionItem extends PopupMenu.PopupMenuItem {
         }
 
         this.label.set_x_expand(true);
-        this.label.clutter_text.set_text(this._filename);
+        const escName = GLib.markup_escape_text(this._filename, -1);
+        const escMtime = GLib.markup_escape_text(this._modification_time, -1);
+        this.label.clutter_text.set_use_markup(true);
+        this.label.clutter_text.set_markup(`${escName}\n<small>${escMtime}</small>`);
 
         this._sessionItemButtons = new SessionItemButtons.SessionItemButtons(this);
         this._sessionItemButtons.addButtons();

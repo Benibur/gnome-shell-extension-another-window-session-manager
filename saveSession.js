@@ -65,19 +65,19 @@ export const SaveSession = class {
         }
     }
 
-    async saveSessionAsync(sessionName, baseDir = null, backup = true) {
+    async saveSessionAsync(sessionName, baseDir = null, backup = true, notify = true) {
         try {
             this._log.debug(`Generating session ${sessionName}`);
 
             const sessionConfig = await this._buildSession(sessionName);
-    
+
             sessionConfig.x_session_config_objects = sessionConfig.sort();
-            
+
             if (backup) {
                 await this.backupExistingSessionIfNecessary(sessionName, baseDir);
             }
-    
-            await this._saveSessionConfigAsync(sessionConfig, baseDir);
+
+            await this._saveSessionConfigAsync(sessionConfig, baseDir, null, notify);
     
             // TODO saved Notification   
         } catch (error) {
@@ -416,7 +416,7 @@ export const SaveSession = class {
         }
     }
 
-    _saveSessionConfigAsync(sessionConfig, baseDir = null, cancellable = null) {
+    _saveSessionConfigAsync(sessionConfig, baseDir = null, cancellable = null, notify = true) {
         if (cancellable && cancellable.is_cancelled()) {
             return Promise.resolve(false);
         }
@@ -460,7 +460,7 @@ export const SaveSession = class {
                             if (success) {
                                 const savedMsg = `Session ${sessionConfig.session_name} saved to ${sessionFile.get_path()}!`;
                                 Log.Log.getDefault().info(`${savedMsg}`);
-                                if (this._notifyUser && this._settings.get_boolean('enable-save-session-notification')) {
+                                if (notify && this._notifyUser && this._settings.get_boolean('enable-save-session-notification')) {
                                     Main.notify(`Another Window Session Manager`, savedMsg);
                                 }
                                 resolve(success);
