@@ -16,6 +16,6 @@ export const GDK_META_MASK     = 1 << 28;
 
 /* prefs settings */
 export const PREFS_SETTING_AUTORESTORE_SESSIONS = 'autorestore-sessions';
+export const PREFS_SETTING_AUTOSAVE_SESSIONS = 'autosave-sessions';
 
-
-
+export const AUTOSAVE_DEFAULT_INTERVAL_MINUTES = 10;

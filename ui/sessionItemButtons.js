@@ -42,6 +42,9 @@ class SessionItemButtons extends GObject.Object {
         this._closeSession = new CloseSession.CloseSession(CloseSession.flags.closeWindows);
 
         this._settings = PrefsUtils.getSettings();
+
+        this._autosaveTimerId = 0;
+        this._initAutosaveTimer();
     }
 
     addButtons() {
@@ -92,6 +95,26 @@ class SessionItemButtons extends GObject.Object {
         this._settings.connect(`changed::${Constants.PREFS_SETTING_AUTORESTORE_SESSIONS}`, (settings) => {
             const toggled = this.sessionItem._filename == this._settings.get_string(Constants.PREFS_SETTING_AUTORESTORE_SESSIONS);
             this._autostartSwitch.state = toggled;
+        });
+
+        const autoSaveSwitcher = this._addAutoSaveSwitcher();
+        new Tooltip.Tooltip({
+            parent: autoSaveSwitcher,
+            markup: `Auto-save session every ${Constants.AUTOSAVE_DEFAULT_INTERVAL_MINUTES} min`,
+        });
+        autoSaveSwitcher.connect('clicked', () => {
+            const enabled = this._autosaveSwitch.state;
+            this._setAutosaveConfig(enabled);
+            if (enabled) {
+                this._startAutosaveTimer();
+            } else {
+                this._stopAutosaveTimer();
+            }
+        });
+
+        this._settings.connect(`changed::${Constants.PREFS_SETTING_AUTOSAVE_SESSIONS}`, () => {
+            const config = this._getAutosaveConfig();
+            this._autosaveSwitch.state = config.enabled;
         });
 
         this._addSeparator();
@@ -240,5 +263,78 @@ class SessionItemButtons extends GObject.Object {
     _onClickClose(button, event) {
         // TODO Close specified windows in the session?
         this._closeSession.closeWindows();
+    }
+
+    // --- Auto-save feature ---
+
+    _addAutoSaveSwitcher() {
+        const config = this._getAutosaveConfig();
+        this._autosaveSwitch = new PopupMenu.Switch(config.enabled);
+        this._autosaveSwitch.set_style_class_name('toggle-switch awsm-toggle-switch-autosave');
+        let button = new St.Button({
+            style_class: 'dnd-button',
+            can_focus: true,
+            x_align: Clutter.ActorAlign.END,
+            toggle_mode: true,
+            child: this._autosaveSwitch,
+            reactive: true,
+        });
+        this._autosaveSwitch.bind_property('state',
+            button, 'checked',
+            GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE);
+        this.sessionItem.actor.add_child(button);
+        return button;
+    }
+
+    _getAutosaveConfig() {
+        const allConfig = JSON.parse(this._settings.get_string(Constants.PREFS_SETTING_AUTOSAVE_SESSIONS));
+        const sessionConfig = allConfig[this.sessionItem._filename];
+        return {
+            enabled: sessionConfig?.enabled || false,
+            intervalMinutes: sessionConfig?.intervalMinutes || Constants.AUTOSAVE_DEFAULT_INTERVAL_MINUTES,
+        };
+    }
+
+    _setAutosaveConfig(enabled) {
+        const allConfig = JSON.parse(this._settings.get_string(Constants.PREFS_SETTING_AUTOSAVE_SESSIONS));
+        if (enabled) {
+            allConfig[this.sessionItem._filename] = {
+                enabled: true,
+                intervalMinutes: Constants.AUTOSAVE_DEFAULT_INTERVAL_MINUTES,
+            };
+        } else {
+            delete allConfig[this.sessionItem._filename];
+        }
+        this._settings.set_string(Constants.PREFS_SETTING_AUTOSAVE_SESSIONS, JSON.stringify(allConfig));
+    }
+
+    _initAutosaveTimer() {
+        const config = this._getAutosaveConfig();
+        if (config.enabled) {
+            this._startAutosaveTimer();
+        }
+    }
+
+    _startAutosaveTimer() {
+        this._stopAutosaveTimer();
+        const config = this._getAutosaveConfig();
+        const intervalSeconds = config.intervalMinutes * 60;
+        this._autosaveTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, intervalSeconds, () => {
+            this._saveSession.saveSessionAsync(this.sessionItem._filename, null, false).catch(e => {
+                this._log.error(e, `Auto-save failed for session ${this.sessionItem._filename}`);
+            });
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _stopAutosaveTimer() {
+        if (this._autosaveTimerId) {
+            GLib.source_remove(this._autosaveTimerId);
+            this._autosaveTimerId = 0;
+        }
+    }
+
+    destroy() {
+        this._stopAutosaveTimer();
     }
 });

@@ -6,6 +6,14 @@
     background-image: url("./icons/toggle-on-autorestore-symbolic.svg");
 }
 
+.awsm-toggle-switch-autosave {
+    background-image: url("./icons/toggle-off-autorestore-symbolic.svg");
+}
+
+.awsm-toggle-switch-autosave:checked {
+    background-image: url("./icons/toggle-on-autorestore-symbolic.svg");
+}
+
 /* Restore Session Dialog */
 .restore-session-dialog {
     width: 30em;

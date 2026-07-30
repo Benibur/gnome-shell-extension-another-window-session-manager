@@ -43,8 +43,11 @@ class SessionItem extends PopupMenu.PopupMenuItem {
 
     }
 
-   
-    
+    destroy() {
+        this._sessionItemButtons.destroy();
+        super.destroy();
+    }
+
 });
 
 const EmptySessionItem = GObject.registerClass(
